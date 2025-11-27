@@ -1,3 +1,4 @@
+const { error } = require('console');
 const pool = require('./database.js');
 
 const express = require('express');
@@ -27,7 +28,42 @@ app.post('/login', (req, res) => {
 });
 
 //User registration endpoint
+app.post('/api/register', async (req, res) => {
+    try {
+        const {email, password, firstName, lastName} = req.body;
 
+        //validation
+        if (!email || !password || !firstName || !lastName) {
+            return res.status(400).json({ error: 'All fields are required' });
+        }
+
+        //Check if the user already exists
+        const userExists = await pool.query(
+            'SELECT id FROM users WHERE email = $1', [email]
+        );
+
+        if (userExists.rows.length > 0) {
+            return res.status(400).json({error: 'User already exists' });
+        }
+
+        //TODO: Hash password (later)
+        const passwordHash = password;
+
+        //New user
+        const newUser = await pool.query(
+            'INSERT INTO users (email, password_hash,first_name, last_name) VALUES ($1, $2, $3, $4) RETURNING id, email, first_name, last_name', [email, passwordHash, firstName, lastName]
+        );
+
+        res.status(201).json({
+            message: 'User created successfully',
+            user: newUser.row[0]
+        });
+
+    } catch (error) {
+        console.error('Registration error:', error);
+        res.status(500).json({ error: 'Internal server error' })
+    }
+});
 
 // Start server
 app.listen(PORT, () => {

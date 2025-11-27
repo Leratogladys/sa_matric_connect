@@ -1,8 +1,5 @@
 const bcrypt = require('bcrypt');
-
-const { error } = require('console');
 const pool = require('./database.js');
-
 const express = require('express');
 const path = require('path');
 const app = express();
@@ -33,9 +30,11 @@ app.post('/login', (req, res) => {
 app.post('/api/register', async (req, res) => {
     try {
         const { email, password, firstName, lastName } = req.body;
+        console.log('Registration attempt:', { email, firstName, lastName });
         
         // Basic validation
         if (!email || !password || !firstName || !lastName) {
+            console.log('Validation failed: missing fields');
             return res.status(400).json({ error: 'All fields are required' });
         }
 
@@ -46,11 +45,13 @@ app.post('/api/register', async (req, res) => {
         );
 
         if (userExists.rows.length > 0) {
+            console.log('User already exists:', email);
             return res.status(400).json({ error: 'User already exists' });
         }
 
         // Hash password
         const passwordHash = await bcrypt.hash(password, 10);
+        console.log('Password hashed successfully');
 
         // Insert new user
         const newUser = await pool.query(
@@ -58,14 +59,16 @@ app.post('/api/register', async (req, res) => {
             [email, passwordHash, firstName, lastName]
         );
 
-        return res.status(201).json({
+        console.log('User created successfully:', newUser.rows[0]);
+        
+        res.status(201).json({
             message: 'User created successfully',
             user: newUser.rows[0]
         });
 
     } catch (error) {
         console.error('Registration error:', error);
-        return res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({ error: 'Internal server error: ' + error.message });
     }
 });
 

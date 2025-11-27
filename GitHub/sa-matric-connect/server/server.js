@@ -1,3 +1,5 @@
+const bcrypt = require('bcrypt');
+
 const { error } = require('console');
 const pool = require('./database.js');
 
@@ -30,38 +32,42 @@ app.post('/login', (req, res) => {
 //User registration endpoint
 app.post('/api/register', async (req, res) => {
     try {
-        const {email, password, firstName, lastName} = req.body;
+        const { email, password, firstName, lastName } = req.body;
 
         //validation
-        if (!email || !password || !firstName || !lastName) {
+       if (!email || !password || !firstName || !lastName) {
             return res.status(400).json({ error: 'All fields are required' });
         }
 
         //Check if the user already exists
-        const userExists = await pool.query(
-            'SELECT id FROM users WHERE email = $1', [email]
+         const userExists = await pool.query(
+            'SELECT id FROM users WHERE email = $1', 
+            [email]
         );
 
-        if (userExists.rows.length > 0) {
-            return res.status(400).json({error: 'User already exists' });
+         if (userExists.rows.length > 0) {
+            return res.status(400).json({ error: 'User already exists' });
         }
 
         //TODO: Hash password (later)
-        const passwordHash = password;
+         const passwordHash = await bcrypt.hash(password, 10);
+
+        
 
         //New user
-        const newUser = await pool.query(
-            'INSERT INTO users (email, password_hash,first_name, last_name) VALUES ($1, $2, $3, $4) RETURNING id, email, first_name, last_name', [email, passwordHash, firstName, lastName]
+       const newUser = await pool.query(
+            'INSERT INTO users (email, password_hash, first_name, last_name) VALUES ($1, $2, $3, $4) RETURNING id, email, first_name, last_name',
+            [email, passwordHash, firstName, lastName]
         );
 
-        res.status(201).json({
+        return res.status(201).json({
             message: 'User created successfully',
-            user: newUser.row[0]
+            user: newUser.rows[0]
         });
 
-    } catch (error) {
+     } catch (error) {
         console.error('Registration error:', error);
-        res.status(500).json({ error: 'Internal server error' })
+        return res.status(500).json({ error: 'Internal server error' });
     }
 });
 

@@ -1,3 +1,5 @@
+console.log('Server starting...');
+
 const bcrypt = require('bcrypt');
 const pool = require('./database.js');
 const express = require('express');
@@ -19,11 +21,28 @@ app.get('/home', (req, res) => {
     res.sendFile(path.join(__dirname, '../public/homepage.html'));
 });
 
+//Debug route to check if API routes work
+app.get('/api/test', (req, res) => {
+    console.log('API test route hit');
+    res.json({ message: 'API is working' });
+});
+
 // Temporary login endpoint (we'll add real authentication later)
 app.post('/login', (req, res) => {
     console.log('Login attempt:', req.body);
     // For now, just redirect to homepage
     res.redirect('/home');
+});
+
+console.log('Registering /api/test route');
+app.get('/api/test', (req, res) => {
+    console.log('API test route hit');
+    res.json({ message: 'API is working!' });
+});
+
+console.log('Registering /api/login route');
+app.post('/api/login', async (req, res) => {
+    // your login code
 });
 
 app.post('/api/login', async (req, res) => {
@@ -61,6 +80,11 @@ app.post('/api/login', async (req, res) => {
         console.error('Login error:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
+});
+
+console.log('Registering /api/register route'); 
+app.post('/api/register', async (req, res) => {
+    // your register code
 });
 
 // User registration endpoint
@@ -106,6 +130,14 @@ app.post('/api/register', async (req, res) => {
     } catch (error) {
         console.error('Registration error:', error);
         res.status(500).json({ error: 'Internal server error: ' + error.message });
+    }
+});
+
+//Logging all registered routes
+console.log('Registered routes: ');
+app._router.stack.forEach((middleware) => {
+    if (middleware.route) {
+        console.log(`${Object.keys(middleware.route.methods)} ${middleware.route.path}`);
     }
 });
 

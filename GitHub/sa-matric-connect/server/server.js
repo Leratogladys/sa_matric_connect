@@ -26,6 +26,42 @@ app.post('/login', (req, res) => {
     res.redirect('/home');
 });
 
+app.post('/api/login', async (req, res) => {
+    try{
+        const { email, password} = req.body;
+
+        //Find user 
+        const user = await pool.query(
+            'SELECT * FROM users WHERE email = $1',[email]
+        );
+
+        if (user.rows.length === 0) {
+            return res.status(400).json({ error: 'Invalid credentials' });
+
+            //checking password
+            const validPassword = await bcrypt.compare(password, user.rows[0].password_hash);
+
+            if (!validPassword) {
+                return res.status(400).json({ error: 'Invalid credentials' });
+
+                //Successful login
+                res.json({
+                    message: 'Login successful',
+                    user: {
+                        id: user.rows[0].id,
+                        email: user.rows[0].email,
+                        firstName: user.rows[0].first_name,
+                        lastName: user.rows[0].last_name
+                    }
+                });
+
+            } catch (error) {
+                console.error('Login error:', error);
+                res.status(500).json({ error: 'Internal server error' });
+            }
+        }
+    });
+
 // User registration endpoint
 app.post('/api/register', async (req, res) => {
     try {

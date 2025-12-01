@@ -21,7 +21,7 @@ app.use(cookieParser());
 const authenticateToken = (req, res, next) => {
     // Get token from cookie or Authorization header
     const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
-    
+
     if (!token) {
         return res.status(401).json({ error: 'Access denied. No token provided.' });
     }
@@ -109,13 +109,17 @@ app.post('/api/login', async (req, res) => {
 
         // Create JWT token
         const token = jwt.sign(
-            { 
+            {
                 userId: user.rows[0].id,
                 email: user.rows[0].email
             },
             JWT_SECRET,
             { expiresIn: JWT_EXPIRES_IN }
         );
+
+        console.log('Creating JWT token for user:', user.rows[0].id);
+        console.log('Token created:', token.substring(0, 20) + '...');
+        console.log('Setting cookie...');
 
         // Set token as HTTP-only cookie
         res.cookie('token', token, {
@@ -124,6 +128,8 @@ app.post('/api/login', async (req, res) => {
             sameSite: 'strict',
             maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
         });
+
+        console.log('Cookie should be set now');
 
         // Successful login
         console.log('Login successful for:', email);
@@ -154,7 +160,7 @@ app.post('/api/register', async (req, res) => {
     try {
         const { email, password, firstName, lastName } = req.body;
         console.log('Registration attempt:', { email, firstName, lastName });
-        
+
         // Basic validation
         if (!email || !password || !firstName || !lastName) {
             console.log('Validation failed: missing fields');
@@ -163,7 +169,7 @@ app.post('/api/register', async (req, res) => {
 
         // Check if user already exists
         const userExists = await pool.query(
-            'SELECT id FROM users WHERE email = $1', 
+            'SELECT id FROM users WHERE email = $1',
             [email]
         );
 
@@ -183,7 +189,7 @@ app.post('/api/register', async (req, res) => {
         );
 
         console.log('User created successfully:', newUser.rows[0]);
-        
+
         res.status(201).json({
             message: 'User created successfully',
             user: newUser.rows[0]
@@ -197,9 +203,9 @@ app.post('/api/register', async (req, res) => {
 
 // Example protected route (for testing)
 app.get('/api/protected', authenticateToken, (req, res) => {
-    res.json({ 
+    res.json({
         message: 'This is protected data!',
-        user: req.user 
+        user: req.user
     });
 });
 

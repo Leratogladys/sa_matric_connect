@@ -2,13 +2,38 @@ const bcrypt = require('bcrypt');
 const pool = require('./database.js');
 const express = require('express');
 const path = require('path');
+const jwt = require('jsonwebtoken');
+const cookieParser = require('cookie-parser');
 const app = express();
 const PORT = 3000;
 
-// Serve static files (HTML, CSS, JS)
+// JWT Configuration
+const JWT_SECRET = 'sa-matric-connect-super-secret-key-2024'; // Change this in production!
+const JWT_EXPIRES_IN = '7d'; // Token expires in 7 days
+
+// Middleware
 app.use(express.static('public'));
 app.use(express.json()); // For parsing JSON data
 app.use(express.urlencoded({ extended: true })); // For parsing form data
+app.use(cookieParser());
+
+// Authentication middleware
+const authenticateToken = (req, res, next) => {
+    // Get token from cookie or Authorization header
+    const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
+    
+    if (!token) {
+        return res.status(401).json({ error: 'Access denied. No token provided.' });
+    }
+
+    try {
+        const verified = jwt.verify(token, JWT_SECRET);
+        req.user = verified;
+        next();
+    } catch (error) {
+        res.status(400).json({ error: 'Invalid token.' });
+    }
+};
 
 // Routes
 app.get('/', (req, res) => {
@@ -19,10 +44,9 @@ app.get('/home', (req, res) => {
     res.sendFile(path.join(__dirname, '../public/homepage.html'));
 });
 
-// Temporary login endpoint (we'll add real authentication later)
+// Temporary login endpoint (redirects to homepage)
 app.post('/login', (req, res) => {
     console.log('Login attempt:', req.body);
-    // For now, just redirect to homepage
     res.redirect('/home');
 });
 
@@ -32,8 +56,36 @@ app.get('/api/test', (req, res) => {
     res.json({ message: 'API is working!' });
 });
 
-// User login endpoint
+// Get current user info (protected route)
+app.get('/api/me', authenticateToken, async (req, res) => {
+    try {
+        const user = await pool.query(
+            'SELECT id, email, first_name, last_name, created_at FROM users WHERE id = $1',
+            [req.user.userId]
+        );
+
+        if (user.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        res.json({
+            user: {
+                id: user.rows[0].id,
+                email: user.rows[0].email,
+                firstName: user.rows[0].first_name,
+                lastName: user.rows[0].last_name,
+                createdAt: user.rows[0].created_at
+            }
+        });
+    } catch (error) {
+        console.error('Get user error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// User login endpoint with JWT
 app.post('/api/login', async (req, res) => {
+    console.log('=== /api/login START ===');
     try {
         const { email, password } = req.body;
         console.log('Login attempt for:', email);
@@ -43,6 +95,8 @@ app.post('/api/login', async (req, res) => {
             'SELECT * FROM users WHERE email = $1', [email]
         );
 
+        console.log('User query result:', user.rows.length > 0 ? 'Found' : 'Not found');
+
         if (user.rows.length === 0) {
             console.log('User not found:', email);
             return res.status(400).json({ error: 'Invalid credentials' });
@@ -50,14 +104,37 @@ app.post('/api/login', async (req, res) => {
 
         // Check password
         const validPassword = await bcrypt.compare(password, user.rows[0].password_hash);
+        console.log('Password valid:', validPassword);
 
         if (!validPassword) {
             console.log('Invalid password for:', email);
             return res.status(400).json({ error: 'Invalid credentials' });
         }
 
+        // Create JWT token
+        console.log('Creating JWT token...');
+        const token = jwt.sign(
+            { 
+                userId: user.rows[0].id,
+                email: user.rows[0].email
+            },
+            JWT_SECRET,
+            { expiresIn: JWT_EXPIRES_IN }
+        );
+        console.log('Token created (first 20 chars):', token.substring(0, 20) + '...');
+
+        // Set token as HTTP-only cookie
+        console.log('Setting cookie...');
+        res.cookie('token', token, {
+            httpOnly: true,
+            secure: false, // Set to true in production with HTTPS
+            sameSite: 'strict',
+            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+        });
+        console.log('Cookie set!');
+
         // Successful login
-        console.log('Login successful for:', email);
+        console.log('Sending response...');
         res.json({
             message: 'Login successful',
             user: {
@@ -67,11 +144,18 @@ app.post('/api/login', async (req, res) => {
                 lastName: user.rows[0].last_name
             }
         });
+        console.log('=== /api/login END ===');
 
     } catch (error) {
         console.error('Login error:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
+});
+
+// Logout endpoint
+app.post('/api/logout', (req, res) => {
+    res.clearCookie('token');
+    res.json({ message: 'Logged out successfully' });
 });
 
 // User registration endpoint
@@ -118,6 +202,14 @@ app.post('/api/register', async (req, res) => {
         console.error('Registration error:', error);
         res.status(500).json({ error: 'Internal server error: ' + error.message });
     }
+});
+
+// Example protected route (for testing)
+app.get('/api/protected', authenticateToken, (req, res) => {
+    res.json({ 
+        message: 'This is protected data!',
+        user: req.user 
+    });
 });
 
 // Start server

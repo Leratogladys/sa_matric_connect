@@ -21,7 +21,7 @@ app.use(cookieParser());
 const authenticateToken = (req, res, next) => {
     // Get token from cookie or Authorization header
     const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
-
+    
     if (!token) {
         return res.status(401).json({ error: 'Access denied. No token provided.' });
     }
@@ -85,6 +85,7 @@ app.get('/api/me', authenticateToken, async (req, res) => {
 
 // User login endpoint with JWT
 app.post('/api/login', async (req, res) => {
+    console.log('=== /api/login START ===');
     try {
         const { email, password } = req.body;
         console.log('Login attempt for:', email);
@@ -94,6 +95,8 @@ app.post('/api/login', async (req, res) => {
             'SELECT * FROM users WHERE email = $1', [email]
         );
 
+        console.log('User query result:', user.rows.length > 0 ? 'Found' : 'Not found');
+
         if (user.rows.length === 0) {
             console.log('User not found:', email);
             return res.status(400).json({ error: 'Invalid credentials' });
@@ -101,6 +104,7 @@ app.post('/api/login', async (req, res) => {
 
         // Check password
         const validPassword = await bcrypt.compare(password, user.rows[0].password_hash);
+        console.log('Password valid:', validPassword);
 
         if (!validPassword) {
             console.log('Invalid password for:', email);
@@ -108,31 +112,29 @@ app.post('/api/login', async (req, res) => {
         }
 
         // Create JWT token
+        console.log('Creating JWT token...');
         const token = jwt.sign(
-            {
+            { 
                 userId: user.rows[0].id,
                 email: user.rows[0].email
             },
             JWT_SECRET,
             { expiresIn: JWT_EXPIRES_IN }
         );
-
-        console.log('Creating JWT token for user:', user.rows[0].id);
-        console.log('Token created:', token.substring(0, 20) + '...');
-        console.log('Setting cookie...');
+        console.log('Token created (first 20 chars):', token.substring(0, 20) + '...');
 
         // Set token as HTTP-only cookie
+        console.log('Setting cookie...');
         res.cookie('token', token, {
             httpOnly: true,
-            secure: false, // Set to true in production with HTTPS
+            secure: false,
             sameSite: 'strict',
-            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+            maxAge: 7 * 24 * 60 * 60 * 1000
         });
-
-        console.log('Cookie should be set now');
+        console.log('Cookie set!');
 
         // Successful login
-        console.log('Login successful for:', email);
+        console.log('Sending response...');
         res.json({
             message: 'Login successful',
             user: {
@@ -142,6 +144,7 @@ app.post('/api/login', async (req, res) => {
                 lastName: user.rows[0].last_name
             }
         });
+        console.log('=== /api/login END ===');
 
     } catch (error) {
         console.error('Login error:', error);
@@ -160,7 +163,7 @@ app.post('/api/register', async (req, res) => {
     try {
         const { email, password, firstName, lastName } = req.body;
         console.log('Registration attempt:', { email, firstName, lastName });
-
+        
         // Basic validation
         if (!email || !password || !firstName || !lastName) {
             console.log('Validation failed: missing fields');
@@ -169,7 +172,7 @@ app.post('/api/register', async (req, res) => {
 
         // Check if user already exists
         const userExists = await pool.query(
-            'SELECT id FROM users WHERE email = $1',
+            'SELECT id FROM users WHERE email = $1', 
             [email]
         );
 
@@ -189,7 +192,7 @@ app.post('/api/register', async (req, res) => {
         );
 
         console.log('User created successfully:', newUser.rows[0]);
-
+        
         res.status(201).json({
             message: 'User created successfully',
             user: newUser.rows[0]
@@ -203,9 +206,9 @@ app.post('/api/register', async (req, res) => {
 
 // Example protected route (for testing)
 app.get('/api/protected', authenticateToken, (req, res) => {
-    res.json({
+    res.json({ 
         message: 'This is protected data!',
-        user: req.user
+        user: req.user 
     });
 });
 

@@ -4,86 +4,84 @@ const express = require('express');
 const path = require('path');
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
+require('dotenv').config();
 const app = express();
 const PORT = 3000;
 
 // JWT Configuration
-const JWT_SECRET = 'sa-matric-connect-super-secret-key-2024'; // Change this in production!
-const JWT_EXPIRES_IN = '7d'; // Token expires in 7 days
+const JWT_SECRET = process.env.JWT_SECRET || 'sa-matric-connect-super-secret-key-2024';
+const JWT_EXPIRES_IN = '7d';
 
 // Middleware
 app.use(express.static('public'));
-app.use(express.json()); // For parsing JSON data
-app.use(express.urlencoded({ extended: true })); // For parsing form data
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// Authentication middleware
-const authenticateToken = (req, res, next) => {
-    // Get token from cookie or Authorization header
-    const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
-    
+// ========== AUTHENTICATION MIDDLEWARE ==========
+
+// For HTML page protection (redirects to login)
+function authenticateToken(req, res, next) {
+    const token = req.cookies.token;
+
+    if (!token) {
+        return res.redirect('/'); // Redirect to login page
+    }
+
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+        if (err) {
+            res.clearCookie('token'); // Clear invalid cookie
+            return res.redirect('/');
+        }
+        req.user = user;
+        next();
+    });
+}
+
+// For API protection (returns JSON errors)
+function authenticateTokenAPI(req, res, next) {
+    const token = req.cookies.token;
+
     if (!token) {
         return res.status(401).json({ error: 'Access denied. No token provided.' });
     }
 
-    try {
-        const verified = jwt.verify(token, JWT_SECRET);
-        req.user = verified;
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+        if (err) {
+            return res.status(400).json({ error: 'Invalid token.' });
+        }
+        req.user = user;
         next();
-    } catch (error) {
-        res.status(400).json({ error: 'Invalid token.' });
-    }
-};
+    });
+}
 
-// Routes
+// ========== ROUTES ==========
+
+// 1. Landing/Login page
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, '../public/index.html'));
+    const token = req.cookies.token;
+    if (token) {
+        // Already logged in, go to home
+        return res.redirect('/home');
+    }
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.get('/home', (req, res) => {
-    res.sendFile(path.join(__dirname, '../public/homepage.html'));
+// 2. PROTECTED Home page
+app.get('/home', authenticateToken, (req, res) => {
+    // Use 'homepage.html' since that's your actual filename
+    res.sendFile(path.join(__dirname, 'public', 'homepage.html'));
 });
 
-// Temporary login endpoint (redirects to homepage)
-app.post('/login', (req, res) => {
-    console.log('Login attempt:', req.body);
-    res.redirect('/home');
-});
+// ========== API ENDPOINTS ==========
 
-// Debug route to check if API routes are working
+// Test API endpoint
 app.get('/api/test', (req, res) => {
     console.log('API test route hit');
     res.json({ message: 'API is working!' });
 });
 
-// Get current user info (protected route)
-app.get('/api/me', authenticateToken, async (req, res) => {
-    try {
-        const user = await pool.query(
-            'SELECT id, email, first_name, last_name, created_at FROM users WHERE id = $1',
-            [req.user.userId]
-        );
-
-        if (user.rows.length === 0) {
-            return res.status(404).json({ error: 'User not found' });
-        }
-
-        res.json({
-            user: {
-                id: user.rows[0].id,
-                email: user.rows[0].email,
-                firstName: user.rows[0].first_name,
-                lastName: user.rows[0].last_name,
-                createdAt: user.rows[0].created_at
-            }
-        });
-    } catch (error) {
-        console.error('Get user error:', error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
-
-// User login endpoint with JWT
+// User login endpoint
 app.post('/api/login', async (req, res) => {
     console.log('=== /api/login START ===');
     try {
@@ -142,7 +140,8 @@ app.post('/api/login', async (req, res) => {
                 email: user.rows[0].email,
                 firstName: user.rows[0].first_name,
                 lastName: user.rows[0].last_name
-            }
+            },
+            redirect: '/home'
         });
         console.log('=== /api/login END ===');
 
@@ -155,7 +154,37 @@ app.post('/api/login', async (req, res) => {
 // Logout endpoint
 app.post('/api/logout', (req, res) => {
     res.clearCookie('token');
-    res.json({ message: 'Logged out successfully' });
+    res.json({ 
+        message: 'Logged out successfully',
+        redirect: '/'
+    });
+});
+
+// Get current user info (protected route)
+app.get('/api/me', authenticateTokenAPI, async (req, res) => {
+    try {
+        const user = await pool.query(
+            'SELECT id, email, first_name, last_name, created_at FROM users WHERE id = $1',
+            [req.user.userId]
+        );
+
+        if (user.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        res.json({
+            user: {
+                id: user.rows[0].id,
+                email: user.rows[0].email,
+                firstName: user.rows[0].first_name,
+                lastName: user.rows[0].last_name,
+                createdAt: user.rows[0].created_at
+            }
+        });
+    } catch (error) {
+        console.error('Get user error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
 });
 
 // User registration endpoint
@@ -204,18 +233,20 @@ app.post('/api/register', async (req, res) => {
     }
 });
 
-// Example protected route (for testing)
-app.get('/api/protected', authenticateToken, (req, res) => {
+// Example protected API route (for testing)
+app.get('/api/protected', authenticateTokenAPI, (req, res) => {
     res.json({ 
         message: 'This is protected data!',
         user: req.user 
     });
 });
 
-// Start server
+// ========== START SERVER ==========
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
     console.log('Your landing page: http://localhost:3000/');
     console.log('Your homepage: http://localhost:3000/home');
     console.log('API test endpoint: http://localhost:3000/api/test');
+    console.log('Login API: http://localhost:3000/api/login');
+    console.log('Logout API: http://localhost:3000/api/logout');
 });

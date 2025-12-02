@@ -245,3 +245,39 @@ input[type="email"]:focus {
     padding: 12px 0;
   }
 }
+
+/* Form styles */
+.hidden {
+    display: none !important;
+}
+
+.message {
+    margin-top: 15px;
+    padding: 10px;
+    border-radius: 5px;
+    text-align: center;
+    font-weight: bold;
+}
+
+.message.success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.message.error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+/* Form transitions */
+#loginForm, #registerForm {
+    transition: all 0.3s ease;
+}
+
+/* Button loading state */
+.login-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}

@@ -8,12 +8,13 @@ require('dotenv').config();
 const app = express();
 const PORT = 3000;
 
+
 // JWT Configuration
 const JWT_SECRET = process.env.JWT_SECRET || 'sa-matric-connect-super-secret-key-2024';
 const JWT_EXPIRES_IN = '7d';
 
 // Middleware
-app.use(express.static('public'));
+app.use(express.static(path.join(process.cwd(), '..', 'public')));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -24,13 +25,14 @@ app.use(cookieParser());
 function authenticateToken(req, res, next) {
     const token = req.cookies.token;
 
-    if (!token) {
-        return res.redirect('/'); // Redirect to login page
+   if (!token) {
+        return res.redirect('/');  // Redirect to login page
     }
 
+   
     jwt.verify(token, JWT_SECRET, (err, user) => {
         if (err) {
-            res.clearCookie('token'); // Clear invalid cookie
+            res.clearCookie('token');
             return res.redirect('/');
         }
         req.user = user;
@@ -61,16 +63,15 @@ function authenticateTokenAPI(req, res, next) {
 app.get('/', (req, res) => {
     const token = req.cookies.token;
     if (token) {
-        // Already logged in, go to home
         return res.redirect('/home');
     }
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    res.sendFile(path.join(process.cwd(), '..', 'public', 'index.html'));
 });
 
 // 2. PROTECTED Home page
 app.get('/home', authenticateToken, (req, res) => {
-    // Use 'homepage.html' since that's your actual filename
-    res.sendFile(path.join(__dirname, 'public', 'homepage.html'));
+    res.sendFile(path.join(process.cwd(), '..', 'public', 'homepage.html'));
+    
 });
 
 // ========== API ENDPOINTS ==========
@@ -244,6 +245,8 @@ app.get('/api/protected', authenticateTokenAPI, (req, res) => {
 // ========== START SERVER ==========
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
+    console.log('Current directory:', process.cwd());
+    console.log('Public folder:', path.join(process.cwd(), '..', 'public'));
     console.log('Your landing page: http://localhost:3000/');
     console.log('Your homepage: http://localhost:3000/home');
     console.log('API test endpoint: http://localhost:3000/api/test');

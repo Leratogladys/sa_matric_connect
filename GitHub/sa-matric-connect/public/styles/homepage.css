@@ -63,8 +63,6 @@ body {
     color: var(--secondary-gold);
 }
 
-
-
 .nav-links {
     display: flex;
     gap: 25px;
@@ -216,6 +214,8 @@ body {
 }
 
 /* Search Container */
+
+
 .search-container {
     display: flex;
     align-items: center;
@@ -682,6 +682,7 @@ body {
     font-size: 14px;
 }
 
+
 /* Additional Styles for New Elements */
 .skip-link {
     position: absolute;
@@ -770,11 +771,14 @@ body {
     font-weight: 500;
 }
 
+
 .alert {
     color: var(--error);
     font-family: var(--font-dm-sans);
     font-weight: 600;
 }
+
+
 
 /* Responsive Design */
 @media (max-width: 1024px) {
@@ -864,4 +868,5 @@ body {
         font-size: 11px;
         padding: 5px 10px;
     }
+
 }

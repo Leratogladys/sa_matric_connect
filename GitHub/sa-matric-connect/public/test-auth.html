@@ -107,7 +107,7 @@
         results.innerHTML = 'Testing...';
 
         try {
-          const res = await fetch('/api/login'
+          const res = await fetch('/api/login',
             {
               method: 'POST',
               headers: {'Content-Type': 'application/json'},
@@ -116,7 +116,7 @@
                 password: 'wrongpassword'
               }),
 
-              credentials = 'include'
+              credentials: 'include'
             });
              if (res.status === 401) {
                     results.innerHTML = '<p class="status-pass">✅ Invalid login correctly rejected</p>';

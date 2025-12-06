@@ -4,6 +4,7 @@ const express = require('express');
 const path = require('path');
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
+const { timeStamp } = require('console');
 require('dotenv').config();
 const app = express();
 const PORT = 3000;
@@ -14,12 +15,20 @@ const JWT_SECRET = process.env.JWT_SECRET || 'sa-matric-connect-super-secret-key
 const JWT_EXPIRES_IN = '7d';
 
 // Middleware
+
 app.use(express.static(path.join(process.cwd(), '..', 'public')));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // ========== AUTHENTICATION MIDDLEWARE ==========
+
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    console.log('Cookies:', req.cookies);
+    next();
+});
+
 
 // For HTML page protection (redirects to login)
 function authenticateToken(req, res, next) {
@@ -68,6 +77,14 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(process.cwd(), '..', 'public', 'index.html'));
 });
 
+res.cookie('sa_matric_token', token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production', //Secure in production
+    sameSite: 'strict',
+    maxAge: 24 * 60 * 60 * 1000,
+    path: '/'
+});
+
 // 2. PROTECTED Home page
 app.get('/home', authenticateToken, (req, res) => {
     res.sendFile(path.join(process.cwd(), '..', 'public', 'homepage.html'));
@@ -75,6 +92,50 @@ app.get('/home', authenticateToken, (req, res) => {
 });
 
 // ========== API ENDPOINTS ==========
+
+
+// Add test user endpoint (temporary)
+app.post('/api/test/setup', async (req, res) => {
+    try{
+        //Create test user if one doesn't exist
+        const testUser = {
+        email: 'test@example.com',
+        password: await bcrypt.hash('password123', 10),
+        name: 'Test User'
+    };
+
+    const result = await decodeBase64.query(
+        'INSERT INTO users (email,password_hash,name) VALUES ($1, $2 ,$3) ON CONFLICT (email) DO NOTHING RETURNING id', [testUser.email, testUser.password, testUser.name]
+    );
+
+    res.json ({
+        success: true,
+        message: 'Test user ready',
+        credentials: {
+            email: 'test@example.com',
+            password: 'password123'
+        }
+    });
+
+  } catch (error) {
+    res.status(500).json({error: message});
+    }
+
+});
+
+//Detailed protected test endpoint
+app.get('/api/protected/details', authenticateToken, (req, res) => {
+    res.json({
+        authenticated: true,
+        user: req.user,
+        timeStamp: new Date().toISOString(),
+        sessionInfo: {
+            cookieSettings: 'httpOnly, secure, sameSite=strict',
+            maxAge: '24h'
+        }
+    });
+});
+
 
 // Test API endpoint
 app.get('/api/test', (req, res) => {
@@ -154,22 +215,28 @@ app.post('/api/login', async (req, res) => {
 
 // Logout endpoint
 app.post('/api/logout', (req, res) => {
-    res.clearCookie('token');
-    res.json({ 
-        message: 'Logged out successfully',
-        redirect: '/'
+    res.clearCookie('sa_matric_token', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: "strict",
+        path: '/'
+    });
+
+    res.json({
+        success:true,
+        message: 'Logged out successfully'
     });
 });
 
 // Get current user info (protected route)
-app.get('/api/me', authenticateTokenAPI, async (req, res) => {
+app.get('/api/me', authenticateToken, async (req, res) => {
     try {
-        const user = await pool.query(
-            'SELECT id, email, first_name, last_name, created_at FROM users WHERE id = $1',
-            [req.user.userId]
+        const user = await db.query(
+            'SELECT id, email, name, created_at FROM users WHERE id = $1',
+            [req.user.id]
         );
 
-        if (user.rows.length === 0) {
+         if (user.rows.length === 0) {
             return res.status(404).json({ error: 'User not found' });
         }
 

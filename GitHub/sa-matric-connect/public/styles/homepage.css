@@ -214,14 +214,13 @@ body {
 }
 
 /* Search Container */
-
-
 .search-container {
     display: flex;
     align-items: center;
     min-width: 250px;
     justify-content: flex-end;
 }
+
 .search-container button[type="submit"] {
     display: none !important; 
 }
@@ -252,6 +251,52 @@ body {
     border-color: #ddd;
 }
 
+/* ==================== LOGOUT BUTTON STYLES ==================== */
+
+#logout-btn {
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: var(--font-dm-sans);
+    font-weight: 600;
+    font-size: 14px;
+    letter-spacing: 0.5px;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3);
+    margin-left: 15px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+#logout-btn:hover {
+    background: linear-gradient(135deg, #c82333 0%, #bd2130 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.4);
+}
+
+#logout-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(220, 53, 69, 0.3);
+}
+
+#logout-btn:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* Logout button icon */
+#logout-btn::before {
+    content: '🚪';
+    font-size: 16px;
+}
+
 /* User Section - Added to header */
 .user-section {
     display: flex;
@@ -272,24 +317,6 @@ body {
     font-family: var(--font-dm-sans);
     font-weight: 600;
     color: var(--primary-green);
-}
-
-.logout-btn {
-    padding: 6px 12px;
-    background: var(--primary-green);
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-family: var(--font-dm-sans);
-    font-weight: 500;
-    font-size: 12px;
-    transition: background 0.2s;
-    white-space: nowrap;
-}
-
-.logout-btn:hover {
-    background: #267349;
 }
 
 /* Dashboard Stats */
@@ -682,7 +709,6 @@ body {
     font-size: 14px;
 }
 
-
 /* Additional Styles for New Elements */
 .skip-link {
     position: absolute;
@@ -772,14 +798,80 @@ body {
     display: none;
 }
 
-
 .alert {
     color: var(--error);
     font-family: var(--font-dm-sans);
     font-weight: 600;
 }
 
+/* ==================== NOTIFICATION STYLES ==================== */
+.notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 12px 24px;
+    border-radius: 6px;
+    color: white;
+    font-weight: 500;
+    z-index: 10000;
+    animation: slideIn 0.3s ease;
+    font-family: var(--font-dm-sans);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
 
+.notification-success {
+    background-color: var(--success);
+}
+
+.notification-error {
+    background-color: var(--error);
+}
+
+.notification-info {
+    background-color: var(--primary-green);
+}
+
+@keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideOut {
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(100%); opacity: 0; }
+}
+
+/* ==================== RESPONSIVE LOGOUT BUTTON ==================== */
+
+/* Responsive design for logout button */
+@media (max-width: 768px) {
+    #logout-btn {
+        padding: 8px 16px;
+        font-size: 13px;
+        margin-left: 10px;
+    }
+    
+    #logout-btn::before {
+        font-size: 14px;
+    }
+}
+
+@media (max-width: 480px) {
+    #logout-btn {
+        padding: 6px 12px;
+        font-size: 12px;
+        margin-left: 5px;
+    }
+    
+    #logout-btn span {
+        display: none; /* Hide text on very small screens */
+    }
+    
+    #logout-btn::before {
+        margin-right: 0;
+        font-size: 16px;
+    }
+}
 
 /* Responsive Design */
 @media (max-width: 1024px) {
@@ -864,10 +956,4 @@ body {
     .welcome-message {
         font-size: 12px;
     }
-    
-    .logout-btn {
-        font-size: 11px;
-        padding: 5px 10px;
-    }
-
 }

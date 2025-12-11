@@ -1,45 +1,153 @@
-// check-db.js
-const { Pool } = require('pg');
+const DatabaseChecker = {
+    // API endpoints configuration
+    endpoints: {
+        health: '/api/health',
+        database: '/api/health/database',
+        table: (tableName) => `/api/health/table/${tableName}`,
+        tableStructure: (tableName) => `/api/health/table/${tableName}/structure`
+    },
+@returns {Promise<boolean>} True if server is responsive
+ async checkServer() {
+        try {
+            const response = await fetch(this.endpoints.health, {
+                method: 'GET',
+                headers: { 'Accept': 'application/json' }
+            });
+            return response.ok;
+        } catch (error) {
+            console.error('Server check failed:', error);
+            return false;
+        }
+    },
+ @returns {Promise<Object>} Connection status
+ async checkDatabase() {
+        try {
+            const response = await fetch(this.endpoints.database);
+            
+            if (!response.ok) {
+                throw new Error(`Server responded with ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            // Display results in console
+            console.group('í³Š Database Connection Check');
+            console.log('Status:', data.connected ? 'âœ… Connected' : 'âŒ Disconnected');
+            
+            if (data.connected) {
+                console.log('Database:', data.database_name || 'N/A');
+                console.log('Timestamp:', data.timestamp || new Date().toISOString());
+                console.log('Tables:', data.table_count || 'N/A');
+            } else {
+                console.log('Error:', data.error || 'Unknown error');
+            }
+            console.groupEnd();
+            
+            return {
+                success: true,
+                connected: data.connected || false,
+                data: data
+            };
+            
+        } catch (error) {
+            console.error('âŒ Database check failed:', error.message);
+            return {
+                success: false,
+                connected: false,
+                error: error.message
+            };
+        }
+    },
 
-const pool = new Pool({
-  user: 'postgres',
-  host: 'localhost',
-  database: 'sa_matric_connect',
-  password: 'Lerato@7',
-  port: 5432,
-});
-
-async function checkTable() {
-  try {
-    console.log('ðŸ” Checking users table structure...');
-    
-    // Get table structure
-    const result = await pool.query(`
-      SELECT column_name, data_type, is_nullable
-      FROM information_schema.columns
-      WHERE table_name = 'users'
-      ORDER BY ordinal_position
-    `);
-    
-    console.log('\nðŸ“Š Users table columns:');
-    result.rows.forEach(col => {
-      console.log(`   â€¢ ${col.column_name} (${col.data_type}) ${col.is_nullable === 'NO' ? 'NOT NULL' : ''}`);
-    });
-    
-    // Get sample data
-    const sample = await pool.query('SELECT * FROM users LIMIT 1');
-    console.log('\nðŸ“‹ Sample user data:');
-    if (sample.rows.length > 0) {
-      console.log(JSON.stringify(sample.rows[0], null, 2));
-    } else {
-      console.log('No users found in table');
+@param {string} tableName - Name of the table
+@returns {Promise<Object>} Table existence status
+ async checkTable(tableName) {
+        try {
+            const response = await fetch(this.endpoints.table(tableName));
+            
+            if (!response.ok) {
+                throw new Error(`Server error: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            console.group(`í³‹ Table Check: ${tableName}`);
+            console.log('Exists:', data.exists ? 'âœ… Yes' : 'âŒ No');
+            
+            if (data.exists && data.columns) {
+                console.log('Columns:', data.columns.length);
+                data.columns.forEach(col => {
+                    console.log(`  â€¢ ${col.name} (${col.type})`);
+                });
+            }
+            console.groupEnd();
+            
+            return {
+                success: true,
+                exists: data.exists || false,
+                table: tableName,
+                data: data
+            };
+            
+        } catch (error) {
+            console.error(`âŒ Table check failed for "${tableName}":`, error);
+            return {
+                success: false,
+                exists: false,
+                table: tableName,
+                error: error.message
+            };
+        }
+    },
+ @param {string[]} tables - Array of table names to check
+async runComprehensiveCheck(tables = ['users', 'sessions']) {
+        console.log('í´ Running Comprehensive Database Check');
+        console.log('=' .repeat(50));
+        
+        // Check server
+        const serverOk = await this.checkServer();
+        if (!serverOk) {
+            console.error('âŒ Server is not responding');
+            return false;
+        }
+        console.log('âœ… Server is running');
+        
+        // Check database
+        const dbResult = await this.checkDatabase();
+        if (!dbResult.connected) {
+            console.error('âŒ Database is not accessible');
+            return false;
+        }
+        
+        // Check tables
+        console.log('\ní³‹ Checking tables:');
+        for (const table of tables) {
+            await this.checkTable(table);
+        }
+        
+        console.log('=' .repeat(50));
+        console.log('âœ… Comprehensive check completed');
+        return true;
     }
+};
+
+// Auto-run check if this script is loaded in a browser environment
+if (typeof window !== 'undefined') {
+    // Make available globally
+    window.DatabaseChecker = DatabaseChecker;
     
-  } catch (error) {
-    console.error('âŒ Error:', error.message);
-  } finally {
-    await pool.end();
-  }
+    // Optional: Auto-run on page load (commented out by default)
+    // document.addEventListener('DOMContentLoaded', () => {
+    //     console.log('Database checker loaded. Use DatabaseChecker.runComprehensiveCheck() to test.');
+    // });
+    
+    console.log('âœ… DatabaseChecker loaded. Available methods:');
+    console.log('  â€¢ DatabaseChecker.checkDatabase()');
+    console.log('  â€¢ DatabaseChecker.checkTable("users")');
+    console.log('  â€¢ DatabaseChecker.runComprehensiveCheck()');
 }
 
-checkTable();
+// Export for module systems
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = DatabaseChecker;
+}

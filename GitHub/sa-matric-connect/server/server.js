@@ -25,7 +25,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // ========== STATIC FILES ==========
-const publicPath = path.join(__dirname, '..', 'public');
+const publicPath = path.join(__dirname,'..', 'client', 'public');
 app.use(express.static(publicPath));
 
 console.log('📂 Serving static files from:', publicPath);

@@ -254,7 +254,7 @@ body {
 /* ==================== LOGOUT BUTTON STYLES ==================== */
 
 #logout-btn {
-    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+    background: green;
     color: white;
     border: none;
     padding: 10px 20px;
@@ -265,7 +265,7 @@ body {
     font-size: 14px;
     letter-spacing: 0.5px;
     transition: all 0.3s ease;
-    box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3);
+    box-shadow: 0 2px 8px var(--success);
     margin-left: 15px;
     display: inline-flex;
     align-items: center;
@@ -274,7 +274,7 @@ body {
 }
 
 #logout-btn:hover {
-    background: linear-gradient(135deg, #c82333 0%, #bd2130 100%);
+    background: green;
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(220, 53, 69, 0.4);
 }
@@ -289,12 +289,6 @@ body {
     cursor: not-allowed;
     transform: none;
     box-shadow: none;
-}
-
-/* Logout button icon */
-#logout-btn::before {
-    content: '🚪';
-    font-size: 16px;
 }
 
 /* User Section - Added to header */

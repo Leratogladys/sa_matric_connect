@@ -25,11 +25,16 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // ========== STATIC FILES ==========
-// Serve ALL static files from public folder
 const publicPath = path.join(__dirname, '..', 'public');
 app.use(express.static(publicPath));
 
 console.log('📂 Serving static files from:', publicPath);
+
+// ========== REQUEST LOGGER ==========
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+    next();
+});
 
 // ========== AUTHENTICATION MIDDLEWARE ==========
 function authenticateToken(req, res, next) {
@@ -49,24 +54,37 @@ function authenticateToken(req, res, next) {
     });
 }
 
+function authenticateTokenAPI(req, res, next) {
+    const token = req.cookies?.sa_matric_token;
+
+    if (!token) {
+        return res.status(401).json({ error: 'Access denied. No token provided.' });
+    }
+
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+        if (err) {
+            return res.status(400).json({ error: 'Invalid token.' });
+        }
+        req.user = user;
+        next();
+    });
+}
+
 // ========== ROUTES ==========
 
 // 1. Root route - serve index.html
 app.get('/', (req, res) => {
     const token = req.cookies?.sa_matric_token;
     
-    // If user is already logged in, redirect to home
     if (token) {
         try {
             jwt.verify(token, JWT_SECRET);
             return res.redirect('/home');
         } catch (error) {
-            // Token is invalid, clear it
             res.clearCookie('sa_matric_token');
         }
     }
     
-    // Serve index.html (static middleware will handle this)
     res.sendFile(path.join(publicPath, 'index.html'));
 });
 
@@ -79,30 +97,62 @@ app.get('/home', authenticateToken, (req, res) => {
 
 // Test API endpoint
 app.get('/api/test', (req, res) => {
-    res.json({ message: 'API is working!', timestamp: new Date().toISOString() });
+    res.json({ 
+        message: 'API is working!', 
+        timestamp: new Date().toISOString(),
+        status: 'OK'
+    });
 });
 
-// Login endpoint
+// Login endpoint - FIXED for your database
 app.post('/api/login', async (req, res) => {
     try {
         const { email, password } = req.body;
         console.log('Login attempt for:', email);
 
-        // Find user
+        // Find user - using correct columns
         const userResult = await pool.query(
             'SELECT * FROM users WHERE email = $1', 
             [email]
         );
 
         if (userResult.rows.length === 0) {
+            console.log('User not found:', email);
             return res.status(400).json({ error: 'Invalid credentials' });
         }
 
         const user = userResult.rows[0];
+        console.log('Found user:', { 
+            id: user.id, 
+            email: user.email,
+            firstName: user.first_name,
+            lastName: user.last_name 
+        });
 
-        // Check password
-        const validPassword = await bcrypt.compare(password, user.password_hash);
+        // Check password - FIX for existing plain text password
+        let validPassword = false;
+        
+        // Try bcrypt compare first
+        try {
+            validPassword = await bcrypt.compare(password, user.password_hash);
+        } catch (bcryptError) {
+            // If bcrypt fails, check if password is plain text (for existing test user)
+            if (user.password_hash === password) {
+                console.log('Plain text password match for existing user');
+                validPassword = true;
+                
+                // Update to bcrypt hash for future logins
+                const hashedPassword = await bcrypt.hash(password, 10);
+                await pool.query(
+                    'UPDATE users SET password_hash = $1 WHERE id = $2',
+                    [hashedPassword, user.id]
+                );
+                console.log('Updated password to bcrypt hash');
+            }
+        }
+
         if (!validPassword) {
+            console.log('Invalid password for:', email);
             return res.status(400).json({ error: 'Invalid credentials' });
         }
 
@@ -125,12 +175,19 @@ app.post('/api/login', async (req, res) => {
             path: '/'
         });
 
+        // Create display name
+        const displayName = user.first_name && user.last_name 
+            ? `${user.first_name} ${user.last_name}`
+            : user.first_name || user.last_name || 'User';
+
         res.json({
             message: 'Login successful',
             user: {
                 id: user.id,
                 email: user.email,
-                name: user.name
+                name: displayName,
+                firstName: user.first_name,
+                lastName: user.last_name
             },
             redirect: '/home'
         });
@@ -156,55 +213,64 @@ app.post('/api/logout', (req, res) => {
     });
 });
 
-// Get current user info
-app.get('/api/me', async (req, res) => {
+// Get current user info - FIXED for your database
+app.get('/api/me', authenticateTokenAPI, async (req, res) => {
     try {
-        const token = req.cookies?.sa_matric_token;
-        
-        if (!token) {
-            return res.status(401).json({ error: 'Not authenticated' });
-        }
-
-        const user = jwt.verify(token, JWT_SECRET);
-        
         const userResult = await pool.query(
-            'SELECT id, email, name, created_at FROM users WHERE id = $1',
-            [user.id]
+            'SELECT id, email, first_name, last_name, created_at FROM users WHERE id = $1',
+            [req.user.id]
         );
 
         if (userResult.rows.length === 0) {
             return res.status(404).json({ error: 'User not found' });
         }
 
-        res.json(userResult.rows[0]);
+        const user = userResult.rows[0];
         
+        // Create display name
+        const displayName = user.first_name && user.last_name 
+            ? `${user.first_name} ${user.last_name}`
+            : user.first_name || user.last_name || 'User';
+
+        res.json({
+            id: user.id,
+            email: user.email,
+            name: displayName,
+            firstName: user.first_name,
+            lastName: user.last_name,
+            createdAt: user.created_at
+        });
     } catch (error) {
         console.error('Get user error:', error);
-        res.status(401).json({ error: 'Invalid token' });
+        res.status(500).json({ error: 'Internal server error' });
     }
 });
 
-// Test setup endpoint
+// Test setup endpoint - FIXED for your database
 app.post('/api/test/setup', async (req, res) => {
     try {
-        const testUser = {
-            email: 'test@example.com',
-            password: await bcrypt.hash('password123', 10),
-            name: 'Test User'
-        };
-
+        // Create properly hashed password
+        const hashedPassword = await bcrypt.hash('password123', 10);
+        
         const result = await pool.query(
-            'INSERT INTO users (email, password_hash, name) VALUES ($1, $2, $3) ON CONFLICT (email) DO NOTHING RETURNING id', 
-            [testUser.email, testUser.password, testUser.name]
+            `INSERT INTO users (email, password_hash, first_name, last_name) 
+             VALUES ($1, $2, $3, $4) 
+             ON CONFLICT (email) DO UPDATE 
+             SET password_hash = EXCLUDED.password_hash,
+                 first_name = EXCLUDED.first_name,
+                 last_name = EXCLUDED.last_name
+             RETURNING id, email, first_name, last_name`, 
+            ['test@example.com', hashedPassword, 'Test', 'User']
         );
 
         res.json({
             success: true,
-            message: 'Test user ready',
+            message: 'Test user ready (password updated if existed)',
             credentials: {
                 email: 'test@example.com',
                 password: 'password123'
-            }
+            },
+            user: result.rows[0]
         });
 
     } catch (error) {
@@ -214,39 +280,92 @@ app.post('/api/test/setup', async (req, res) => {
 });
 
 // Protected test endpoint
-app.get('/api/protected', async (req, res) => {
-    try {
-        const token = req.cookies?.sa_matric_token;
-        
-        if (!token) {
-            return res.status(401).json({ error: 'Not authenticated' });
-        }
+app.get('/api/protected', authenticateTokenAPI, (req, res) => {
+    res.json({ 
+        message: 'This is protected data!',
+        user: req.user,
+        timestamp: new Date().toISOString()
+    });
+});
 
-        const user = jwt.verify(token, JWT_SECRET);
-        
-        res.json({ 
-            message: 'This is protected data!',
-            user: user,
-            timestamp: new Date().toISOString()
-        });
-        
-    } catch (error) {
-        console.error('Protected route error:', error);
-        res.status(401).json({ error: 'Invalid token' });
+// ========== ERROR HANDLING ==========
+
+// 404 handler
+app.use((req, res) => {
+    if (req.accepts('html')) {
+        res.status(404).send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>404 - SA Matric Connect</title>
+                <style>
+                    body { 
+                        font-family: 'DM Sans', sans-serif; 
+                        text-align: center; 
+                        padding: 50px; 
+                        background: linear-gradient(135deg, #2E8B57, #003366);
+                        color: white;
+                        min-height: 100vh;
+                        display: flex;
+                        flex-direction: column;
+                        justify-content: center;
+                        align-items: center;
+                    }
+                    h1 { font-size: 48px; margin-bottom: 20px; }
+                    p { font-size: 18px; margin-bottom: 30px; max-width: 600px; }
+                    a { 
+                        color: #FFD700; 
+                        text-decoration: none;
+                        font-weight: bold;
+                        padding: 12px 24px;
+                        border: 2px solid #FFD700;
+                        border-radius: 8px;
+                        transition: all 0.3s;
+                    }
+                    a:hover {
+                        background-color: #FFD700;
+                        color: #003366;
+                    }
+                </style>
+            </head>
+            <body>
+                <h1>404 - Page Not Found</h1>
+                <p>The page you're looking for doesn't exist on SA Matric Connect.</p>
+                <p><a href="/">Go to Login Page</a></p>
+            </body>
+            </html>
+        `);
+    } else if (req.accepts('json')) {
+        res.status(404).json({ error: 'Not found' });
+    } else {
+        res.status(404).type('txt').send('Not found');
     }
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+    console.error('Server error:', err);
+    res.status(500).json({ 
+        error: 'Internal server error',
+        message: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
 });
 
 // ========== START SERVER ==========
 app.listen(PORT, () => {
-    console.log(`\n🚀 Server started successfully!`);
-    console.log('='.repeat(50));
+    console.log(`\n🚀 SA Matric Connect Server Started!`);
+    console.log('='.repeat(60));
     console.log(`📡 Server URL: http://localhost:${PORT}`);
-    console.log(`📂 Serving from: ${publicPath}`);
-    console.log('\n🔗 Available Routes:');
-    console.log('   • Login page: http://localhost:3000/');
-    console.log('   • Homepage: http://localhost:3000/home (protected)');
-    console.log('   • API test: http://localhost:3000/api/test');
-    console.log('   • Create test user: POST http://localhost:3000/api/test/setup');
-    console.log('='.repeat(50));
+    console.log(`📂 Static files: ${publicPath}`);
+    console.log(`💾 Database: sa_matric_connect`);
+    console.log('\n🔗 Quick Access:');
+    console.log('   • Login: http://localhost:3000/');
+    console.log('   • Home: http://localhost:3000/home (login required)');
+    console.log('   • API Test: http://localhost:3000/api/test');
+    console.log('   • Create/Update Test User: POST http://localhost:3000/api/test/setup');
+    console.log('\n🔧 Test Credentials:');
+    console.log('   • Email: test@example.com');
+    console.log('   • Password: password123');
+    console.log('='.repeat(60));
     console.log('💡 Press Ctrl+C to stop\n');
 });

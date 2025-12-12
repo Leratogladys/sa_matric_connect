@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <title>SA Matric Connect - Your Higher Education Gateway</title>
+
+
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,300;1,9..40,400;1,9..40,500;1,9..40,600;1,9..40,700&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="styles/index.css">
+  </head>
+
+  <body>
+    <div class="welcome-banner">
+        <div class="container">
+          Welcome to SA Matric Connect. We wish you well on your university application journey.
+        </div>
+      </div>
+
+      <div class="container">
+        <div class="main-content">
+          <div class="left-section">
+            <div class="hero-text">
+              <h2>Your Higher Education journey starts here</h2>
+              <p>Apply to all South African public universities in one place, track your applications and access NSFAS and other funding information</p>
+            </div>
+          </div>
+          <div class="right-section">
+            <div class="form-header">
+              <h1>SA Matric Connect</h1>
+              <div class="create"> 
+                <a href="#" id="showRegister">Create Profile</a>
+                <a href="forgot-password.html">Forgot password</a>
+              </div>
+            </div>
+            <p class="welcome-text"> Welcome back<br> Your university journey starts here</p>
+
+            <!-- Login Form -->
+            <form id="loginForm">
+              <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" name="email" placeholder="Enter your email" required>
+              </div>
+
+              <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" placeholder="Enter your password" required>
+              </div>
+              <button type="submit" class="login-btn">Login</button>
+              
+              <!-- Message Display -->
+              <div id="loginMessage" class="message"></div>
+            </form>
+
+            <!-- Registration Form (Hidden by default) -->
+            <form id="registerForm" class="hidden">
+              <div class="form-group">
+                <label for="regFirstName">First Name:</label>
+                <input type="text" id="regFirstName" name="firstName" placeholder="Enter your first name" required>
+              </div>
+              
+              <div class="form-group">
+                <label for="regLastName">Last Name:</label>
+                <input type="text" id="regLastName" name="lastName" placeholder="Enter your last name" required>
+              </div>
+              
+              <div class="form-group">
+                <label for="regEmail">Email:</label>
+                <input type="email" id="regEmail" name="email" placeholder="Enter your email" required>
+              </div>
+
+              <div class="form-group">
+                <label for="regPassword">Password</label>
+                <input type="password" id="regPassword" name="password" placeholder="Create a password" required>
+              </div>
+              
+              <button type="submit" class="login-btn">Register</button>
+              
+              <!-- Message Display -->
+              <div id="registerMessage" class="message"></div>
+              
+              <div class="create"> 
+                <a href="#" id="showLogin">Already have an account? Login here</a>
+              </div>
+            </form>
+
+            <div class="divider">or</div>
+            <div class="info-section">
+              <p>All new users must create an account to access the application tracker and university directory.</p>
+            </div>
+
+            <script src="scripts/auth.js"></script>
+          </div>
+        </div>
+      </div>
+  </body>
+</html>
